@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Basic VR Model Viewer</title>
+  <style>
+    body,html{
+      height: 100%;
+      width:100%;
+      margin:0;
+      padding:0;
+      overflow:hidden;
+      font-family: sans-serif;
+    }
+    button {
+      position: fixed;
+      bottom: 0;
+      right: auto;
+      left: 0;
+      margin: 1em 2em;
+      border: 2px solid currentColor;
+      outline: none;
+      font-size: 2vw;
+      padding: .5em 1em;
+      background: #000;
+      color: #fff;
+    }
+    #texture {
+      left: auto;
+      right: 0;
+    }
+    .credits {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-width: 50%;
+      padding: 10px;
+      font-size: 12px;
+      background: rgba(0,0,0,.8);
+      color: #fff;
+      margin: auto;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <button id="texture">Switch texture</button>
+  <div class="credits"></div>
+  <script src="js/three.min.js"></script>
+  <script src="js/StereoEffect.js"></script>
+  <script src="js/DeviceOrientationControls.js"></script>
+  <script src="js/OrbitControls.js"></script>
+  <script>
+    var clock = new THREE.Clock();
+
+      var container;
+      var camera, scene, controls, renderer, room;
+
+      var effect = null;
+      var vrbutton;
+
+
+      function onMobileDevice() {
+        return /Android/i.test(navigator.userAgent) || /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      }
+
+      function enterVR() {
+        if (onMobileDevice()) {
+          effect = new THREE.StereoEffect(renderer);
+          effect.setSize(window.innerWidth, window.innerHeight);
+          effect.separation = 2.5 * 0.0254 / 2;
+        }
+        vrbutton.style.display = 'none';
+      }
+      function exitVR() {
+        effect = null;
+        vrbutton.style.display = 'block';
+      }
+      function onVRButtonPress() {
+        var canvas = document.querySelector('canvas');
+        if ('mozRequestFullScreen' in canvas) {
+          canvas.mozRequestFullScreen();
+        } else if ('webkitRequestFullScreen' in canvas) {
+          canvas.webkitRequestFullScreen();
+        } else {
+          canvas.requestFullScreen();
+        }
+        enterVR();
+      }
+      setupVRMode = function () {
+        vrbutton = document.createElement('button');
+        vrbutton.id = 'vrbutton';
+        document.body.appendChild(vrbutton);
+        vrbutton.innerText = `Enter ${onMobileDevice()?'VR Mode':'Fullscreen'}`;
+        vrbutton.addEventListener('click', onVRButtonPress, false);
+
+        var fschangeEvents = ['webkitfullscreenchange', 'mozfullscreenchange', 'fullscreenchange'];
+        var fsactiveEvents = ['webkitIsFullScreen', 'mozFullScreen', 'fullscreen'];
+
+        fschangeEvents.forEach(function (event, i) {
+          if (`on${event}` in document) {
+            document.addEventListener(event, function (e) {
+              if (!document[fsactiveEvents[i]]) {
+                exitVR();
+              }
+            });
+          }
+        });
+      };
+
+      function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 10);
+
+        if (onMobileDevice()) {
+          controls = new THREE.DeviceOrientationControls(camera);
+        } else {
+          controls = new THREE.OrbitControls(camera);
+          controls.enableZoom = false;
+          controls.enablePan = false;
+        }
+
+        scene.add(camera);
+
+        // Create a box for us to be inside
+        // room = new THREE.Mesh(
+        //   new THREE.BoxGeometry( 6, 6, 6, 8, 8, 8 ),
+        //   new THREE.MeshBasicMaterial( { color: 0x404040, wireframe: true } )
+        // );
+        // scene.add( room );
+
+        // Add some lights
+        var light = new THREE.AmbientLight( 0x606060 );
+        light.position.set(0, 10, 1);
+        scene.add(light);
+
+        var directional = new THREE.DirectionalLight(0xffffff, 1);
+        scene.add(directional);
+
+
+        var spheregeo = new THREE.SphereGeometry(4, 128, 128);
+        var textures = [
+          new THREE.TextureLoader().load('texture.jpg'),
+          new THREE.TextureLoader().load('Beach.jpg'),
+          new THREE.TextureLoader().load('comicon.jpg'),
+          new THREE.TextureLoader().load('doodle.jpg'),
+          new THREE.TextureLoader().load('sandstormer.jpg')
+        ];
+        var credits = [
+          '360° perspective grid by 360-drawing.com',
+          '360° Beach by 360-drawing.com',
+          'Curvilinear perspective drawing for immersive panorama by David Chelsea',
+          'Immersive panorama adapted from icosahedron drawing by David Chelsea.',
+          'Sandstormer by Vlado Králik'
+        ];
+        var spheremat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          side: THREE.DoubleSide,
+        });
+        var sphere = new THREE.Mesh(spheregeo, spheremat);
+        sphere.scale.x = -1;
+
+        scene.add(sphere);
+
+        var button = document.querySelector('#texture');
+        var creditEl = document.querySelector('.credits');
+        var curIndex = 0;
+        sphere.material.map = textures[curIndex];
+        creditEl.innerText = credits[curIndex];
+
+        button.addEventListener('click', function () {
+          curIndex++;
+          if (curIndex >= textures.length) {
+            curIndex = 0;
+          }
+          sphere.material.map = textures[curIndex];
+          creditEl.innerText = credits[curIndex];
+        });
+
+
+
+
+        // Set up the renderer
+        renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.setClearColor( 0x505050 );
+        renderer.setPixelRatio( window.devicePixelRatio );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.sortObjects = false;
+        document.body.appendChild( renderer.domElement );
+
+        window.addEventListener( 'resize', onWindowResize, false );
+        setupVRMode();
+      }
+      function onWindowResize() {
+        var wiw = window.innerWidth;
+        var wih = window.innerHeight;
+        camera.aspect = wiw / wih;
+        camera.updateProjectionMatrix();
+        renderer.setSize( wiw, wih );
+
+        if (effect !== null) {
+          effect.setSize(wiw, wih);
+        }
+      }
+      function animate() {
+        // Stuff to do every frame here
+
+        controls.update();
+        renderer.render( scene, camera );
+        if (effect !== null) {
+          effect.render(scene, camera);
+        }
+        requestAnimationFrame(animate);
+      }
+
+      init();
+      animate();
+
+  </script>
+</body>
+</html>
