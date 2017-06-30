@@ -1,5 +1,6 @@
 ## A basic VR 360 photosphere viewer
 
+![](preview.gif)
 
 ## Image Credits
 
